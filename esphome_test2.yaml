@@ -1,0 +1,18 @@
+substitutions:
+  LOCATION: "esphome_test2"
+  name: "radar_${LOCATION}"
+  friendly_name: "radar_${LOCATION}"
+
+<<: !include esphome_generic_m5stack.yaml.txt
+
+#######################################################
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  manual_ip:
+    static_ip: !secret test2_ip_address
+    gateway: !secret my_gateway
+    subnet: 255.255.255.0
+    dns1: !secret my_dns
+#######################################################
+

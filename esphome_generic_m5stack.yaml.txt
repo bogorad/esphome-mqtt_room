@@ -1,0 +1,151 @@
+#substitutions:
+#  LOCATION: "test2"
+#  name: "radar_${LOCATION}"
+#  friendly_name: "radar_${LOCATION}"
+#
+#<<: !include esphome_generic_m5stack.yaml.txt
+# !!! When overriding, copy button & light from config!!!
+#######################################################
+ota:
+  password: !secret ota_password
+
+api:
+
+logger:
+  level: DEBUG
+
+esp32:
+  board: m5stack-atom
+  framework:
+    type: esp-idf
+
+#######################################################
+# Configuration of M5 Atom Lite onboard RGB LED
+light:
+  - platform: esp32_rmt_led_strip
+    rgb_order: GRB
+    pin: 27
+    num_leds: 1
+    rmt_channel: 0
+    chipset: SK6812
+    is_rgbw: true
+    id: m5stack_led
+    name: "Light"
+    icon: "mdi:led-outline"
+    effects:
+      - random:
+      - flicker:
+      - addressable_rainbow:
+#######################################################
+# Configuration of M5 Atom Lite onboard onboard button
+binary_sensor:
+  - platform: gpio
+    name: "Button"
+    id: m5stack_button
+    pin:
+      number: 39 # button
+      inverted: true
+
+#######################################################
+switch:
+  - platform: factory_reset
+    name: "Restart with Factory Default Settings"
+    entity_category: "diagnostic"
+
+  - platform: restart
+    name: "Restart"
+#######################################################
+text_sensor:
+  - platform: wifi_info
+    ip_address:
+      name: "My IP Address"
+    mac_address:
+      name: "My Mac Wifi Address"
+    ssid:
+      name: "Connected SSID"
+    bssid:
+      name: "Connected BSSID"
+    dns_address:
+      name: "DNS Address"
+#######################################################
+sensor:
+  - platform: wifi_signal
+    name: "WiFi Signal"
+    update_interval: 60s
+#######################################################
+bluetooth_proxy:
+  active: true
+#######################################################
+esp32_improv:
+  authorizer: m5stack_button
+#######################################################
+button:
+  - platform: safe_mode
+    name: "Safe Mode Boot"
+    entity_category: diagnostic
+#############################################
+globals:
+  - id: uuid_z_flip_4
+    type: std::string
+    initial_value: !secret uuid_z_flip_4
+  - id: uuid_pixel_5a
+    type: std::string
+    initial_value: !secret uuid_pixel_5a
+  - id: uuid_pixel_4a
+    type: std::string
+    initial_value: !secret uuid_pixel_4a
+#######################################################
+esphome:
+  name: ${name}
+  friendly_name: "${friendly_name}"
+  name_add_mac_suffix: false
+  comment: "M5stack Atom Lite generic test"
+  includes:
+    - custom_components/lib/OneEuro.h
+    - custom_components/ble_dist.h
+  on_boot:
+    then:
+      lambda: |-
+        addTracker("z-flip-4", id(uuid_z_flip_4).c_str());
+        addTracker("pixel-5a", id(uuid_pixel_5a).c_str());
+        addTracker("pixel-4a", id(uuid_pixel_4a).c_str());
+#######################################################
+mqtt:
+  id: mqtt_client
+  broker: mqtt.bruc
+  client_id: ${name}
+  discovery: false
+  topic_prefix: null
+  log_topic: null
+  idf_send_async: true
+#######################################################
+esp32_ble_tracker:
+  scan_parameters:
+    active: false
+  on_ble_advertise:
+    then:
+      - lambda: |-
+          if(x.get_ibeacon().has_value())
+          {
+            auto rssi = x.get_rssi();
+            auto ib = x.get_ibeacon().value();
+            auto uuid = ib.get_uuid();
+            auto txpwr = ib.get_signal_power();
+            for(auto &t : trackers)
+              if(t.uuid == uuid)
+              {
+                ESP_LOGD("ble_mqtt", "Recognized %s iBeacon: %s", t.name.c_str(), uuid.to_string().c_str());
+                ESP_LOGD("ble_mqtt", "  RSSI:  %d", rssi);
+                id(mqtt_client).publish_json(
+                  "bruc/ibeacons/" + t.name + "/$LOCATION",
+                  [=](JsonObject root)
+                  {
+                    root["id"] = t.name;
+                    root["name"] = "Fancy " + t.name + " name";
+                    root["distance"] = 0-rssi;
+                  }
+                );
+              }
+          };
+
+#############################################
