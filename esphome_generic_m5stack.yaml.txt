@@ -142,7 +142,7 @@ esp32_ble_tracker:
                   {
                     root["id"] = t.name;
                     root["name"] = "Fancy " + t.name + " name";
-                    root["distance"] = 0-rssi;
+                    root["distance"] = 0-rssi-45;
                   }
                 );
               }
